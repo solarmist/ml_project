@@ -20,8 +20,9 @@ import email, getpass, imaplib, os, sys, string
 from datetime import date, datetime, timedelta
 
 def main():
-    ham_dir = './ham' # directory to store ham
-    spam_dir = './spam' # directory to store spam
+    home_dir = sys.argv[0][:-11]
+    ham_dir = home_dir + 'ham' # directory to store ham
+    spam_dir = home_dir + 'spam' # directory to store spam
 
     args = len(sys.argv)
     in_text_format = '%m/%d/%Y' #Accept a date in the format MM/DD/YYYY
