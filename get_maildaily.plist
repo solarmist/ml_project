@@ -1,0 +1,23 @@
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>Label</key>
+		<string>ml_getmail</string>
+		<key>ProgramArguments</key>
+		<array>
+			<string>/Users/solarmist/Desktop/ml_project/get_mail.py</string>
+			<string>Username</string>
+			<string>Password</string>
+		</array>
+		<key>UserName</key>
+		<string>Username</string>
+		<key>StartCalendarInterval</key>
+		<dict>
+			<key>Hour</key>
+			<integer>1</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+	</dict>
+</plist>
+
