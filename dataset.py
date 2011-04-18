@@ -88,16 +88,31 @@ def spam_unique(home_dir, ham, spam):
     
 def main():
     if len(sys.argv) != 3:
-        print 'usage: ./wordcount.py ham_dir spam_dir'
+        print 'usage: ./dataset.py ham_dir spam_dir'
         sys.exit(1)
 
     home_dir = sys.argv[0][:-12]
     ham_dir =  sys.argv[1]
     spam_dir = sys.argv[2]
    
+   #Sample ham and spam, don't use the entire corpus
     ham_word_count, ham_top_50 = build_thesaurus(home_dir, ham_dir)    
     spam_word_count, spam_top_50 = build_thesaurus(home_dir, spam_dir)  
     unique_spam = spam_unique(home_dir, ham_word_count, spam_word_count)
+    
+    #Build dataset
+    #Data set should have the fields
+    #1.) IP Address from the received field in the header (Easy just read it)
+    #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
+    #3.) Subject (Easy just read it)
+    #4.) Name from the From field (Easy just read it)
+    #5.) Content type (Easy just read it)
+    #6.) Attachments: none, text, or non-text (Need to parse this)
+    #7.) Number of URLs present (Count http:// links)
+    #8.) URL ratio (% of message body that is URLs) (This one is tricky, how much of the message to use?)
+    #9.) SPAM word ratio (Again how much of the message to use? Exclude header and attachments?)
+    #10.) SPAM degree as by equation in paper (Simple calculation)
+    #11.) Classification label: Spam or Ham (What the classification SHOULD be. Predefined by filename)
   
 
 
