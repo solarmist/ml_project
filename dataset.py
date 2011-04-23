@@ -27,16 +27,17 @@ class DataMember:
         self.degree_domains_match = 0.0
         self.subject = ''
         self.name = ''
-        #type is True for HTML, False for text
-        self.type_HTML = False
+        #type is 1 for HTML, 2 for text, 3 for mixed
+        self.type_HTML = 1
         #-1 for no attachments, 0 for text attachments, 1 for non-text attachments
         self.attachments = -1
         self.num_urls = 0
         self.percent_urls = 0.0
         self.percent_spam = 0.0
         self.degree_spam = 0.0
-        #False for ham, True for spam
-        self.spam = False
+        #1 for ham, 2 for spam
+        self.spam = 1
+    
     def _print(self, format):
         return format % \
             (self.ip_address,           \
@@ -50,12 +51,15 @@ class DataMember:
             self.percent_spam,          \
             self.degree_spam,           \
             self.spam)    
+    
     def stringFile(self):
         format = '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s'
         return self._print(format)
+    
     def stringPrint(self):
         format = '( %s|||%s|||%s|||%s|||%s|||%s|||%s|||%s|||%s|||%s|||%s )'
         return self._print(format)        
+    
 
 
 def get_message_body(mail):
@@ -111,7 +115,7 @@ def get_type_content(mail):
                             type = 2
                         else:
                             type = 3
-                    elif str(mail[key]).startswith('text/plain'):: 
+                    elif str(mail[key]).startswith('text/plain'):
                         if type == 2:
                             type = 3
         return type
@@ -119,7 +123,7 @@ def get_type_content(mail):
         for part in mail.get_payload():
             temp = get_type_content(part)
             if (type > 1 and type != temp):
-                return 4
+                return 3
             else:
                 type = temp
     return type
@@ -283,29 +287,32 @@ def build_dataset(home_dir, dir, spam, spam_top_50):
             #4.) Name from the From field (Easy just read it)
             if key == 'From':
                 data_set[file_name].name = mail[key]
-            
-            #5.) Content type (Easy just read it)
-            
                 
             #9.) SPAM word ratio 
             #10.) SPAM degree as by equation in paper 
-            
+            w1 = 50 / 51.0
+            w2 = 1 / 51.0
+        
+        #5.) Content type (Easy just read it)
+        data_set[file_name].type_HTML = get_type_content(mail)
         #6.) Attachments: none, text, or non-text 
         data_set[file_name].attachments = get_type_attachments(mail)
         #7.) Number of URLs present 
-        data_set[file_name].num_urls = len( re.findall( \
+        urls = re.findall( \
                     'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', \
-                    get_message_body(mail)) )
+                    get_message_body(mail))
+        data_set[file_name].num_urls = len(urls)
         #8.) URL ratio (% of message body that is URLs)
         length = (get_message_len(mail) * 1.0)
-        data_set[file_name].percent_urls = data_set[file_name].num_urls / length
+        data_set[file_name].percent_urls = len(''.join(urls)) / length
         #11.) Classification label: Spam or Ham
-        if file_name.startswith('spam'):
-            data_set[file_name].spam = True
+        if file_name.startswith('ham'):
+            data_set[file_name].spam = 1
+        else:
+            data_set[file_name].spam = 2
       
-        #print data_set[file_name].stringPrint()
     for key in data_set.keys():
-        print data_set[key].stringPrint()
+        print data_set[key].stringFile()
     #Repeat for ham files
 
 
