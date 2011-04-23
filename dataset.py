@@ -29,14 +29,22 @@ class DataMember:
         self.name = ''
         #type is 1 for HTML, 2 for text, 3 for mixed
         self.type_HTML = 1
-        #-1 for no attachments, 0 for text attachments, 1 for non-text attachments
-        self.attachments = -1
+        #1 for no attachments, 2 for text attachments, 3 for non-text attachments, 4 for mixed
+        self.attachments = 1
         self.num_urls = 0
         self.percent_urls = 0.0
         self.percent_spam = 0.0
         self.degree_spam = 0.0
         #1 for ham, 2 for spam
         self.spam = 1
+    
+    def __str__(self):
+        format = '(%s|%s|%s|%s|%s|%s|%s|%% urls %s|%% spam %s|Degree %s|Spam? %s)'
+        return self._print(format)
+    
+    def file_out(self):
+        format = '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s'
+        return self._print(format)
     
     def _print(self, format):
         return format % \
@@ -52,20 +60,13 @@ class DataMember:
             self.degree_spam,           \
             self.spam)    
     
-    def stringFile(self):
-        format = '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s'
-        return self._print(format)
-    
-    def stringPrint(self):
-        format = '( %s|||%s|||%s|||%s|||%s|||%s|||%s|||%s|||%s|||%s|||%s )'
-        return self._print(format)        
-    
 
 
 def get_message_body(mail):
     text = ''
     if not mail.is_multipart():
-        text = re.sub('(=?[\\r\\n])|(=[\\da-fA-F]{2})','', mail.get_payload())
+        text = re.sub('(=\r\n)|(=[\\da-fA-F]{2})','', mail.get_payload())
+        text = re.sub('[\r\n]',' ', text)
     else:
         for part in mail.get_payload():
             attachment = False
@@ -163,17 +164,26 @@ def get_type_attachments(mail):
     return type
 
 
-def word_count_dict(home_dir, dir, percent):
+def word_count_dict(home_dir, dir, percent = 0.1):
     """Returns a word/count dict for this directory."""
     word_count = {}
     file_list = os.listdir(home_dir + dir)
     count = len(file_list)
     num_samples = max(1, int(count * percent))
     sample_files = []
-    
+        
     #Sample x% of all files to build this thesaurus 
-    for n in range(num_samples):
-        sample_files.append( file_list[ int(random.uniform(0,count)) ] )
+    if dir.find('ham') != -1:
+        for file in file_list:
+            sample_files.append(file);
+    else:
+        for n in range(num_samples):
+            index =  int(random.uniform(0,count))
+            #Ensure all items are unique
+            while file_list[index] in sample_files:
+                index =  int(random.uniform(0,count))
+
+            sample_files.append( file_list[index] )
         
     #Load the list of words to ignore (optional)
     if os.path.isfile(home_dir + 'ignore.txt'):
@@ -193,7 +203,6 @@ def word_count_dict(home_dir, dir, percent):
         
         #Get the message contents
         text = get_message_body(mail)
-            
         raw = nltk.clean_html(text)
         words = nltk.wordpunct_tokenize(raw.lower())
         for word in words:
@@ -232,6 +241,7 @@ def build_thesaurus(home_dir, dir, percent):
 
 
 def spam_unique(home_dir, ham, spam):
+    """Find the words that occur in only 1 spam message"""
     unique = {}
     file = open(home_dir + 'spamOnly.txt','w')
     for word in sorted(spam, key = spam.get):
@@ -239,9 +249,10 @@ def spam_unique(home_dir, ham, spam):
             unique[word] = spam[word]
             file.write(word + ' ' + str(spam[word]) + '\n')        
     file.close()
+    return unique
 
 
-def build_dataset(home_dir, dir, spam, spam_top_50):
+def build_dataset(home_dir, dir, unique_spam, spam_top_50):
     """Build dataset
     Data set should have the fields
     1.) IP Address from the received field in the header
@@ -276,7 +287,7 @@ def build_dataset(home_dir, dir, spam, spam_top_50):
             if key == 'Received':
                 address = re.search('(\d{1,3}\.){3}\d{1,3}',mail[key]).group()
                 if address != '127.0.0.1':
-                    data_set[file_name].ip_address += ' ' + address
+                    data_set[file_name].ip_address += address + ' '
                         
             #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
                         
@@ -288,11 +299,10 @@ def build_dataset(home_dir, dir, spam, spam_top_50):
             if key == 'From':
                 data_set[file_name].name = mail[key]
                 
-            #9.) SPAM word ratio 
-            #10.) SPAM degree as by equation in paper 
-            w1 = 50 / 51.0
-            w2 = 1 / 51.0
-        
+        #Get the length of the message and the text
+        length = (get_message_len(mail) * 1.0)
+        body = get_message_body(mail)
+
         #5.) Content type (Easy just read it)
         data_set[file_name].type_HTML = get_type_content(mail)
         #6.) Attachments: none, text, or non-text 
@@ -300,36 +310,69 @@ def build_dataset(home_dir, dir, spam, spam_top_50):
         #7.) Number of URLs present 
         urls = re.findall( \
                     'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', \
-                    get_message_body(mail))
+                    body)
         data_set[file_name].num_urls = len(urls)
+        
         #8.) URL ratio (% of message body that is URLs)
-        length = (get_message_len(mail) * 1.0)
         data_set[file_name].percent_urls = len(''.join(urls)) / length
+        
+        #9.) SPAM word ratio 
+        #10.) SPAM degree as by equation in paper 
+        spam_count = 0
+        w1 = 50 / 51.0
+        w2 = 1 / 51.0
+        freq_spam = 0.0
+        s1 = 0.0
+        s2 = 0
+        
+        body = nltk.clean_html(body)
+        words = nltk.word_tokenize(body)
+        word_count = max(1, len(words)) #Don't allow divide by zero
+        for word in nltk.word_tokenize(body):
+            if word in unique_spam:
+                #Must be SPAM
+                s2 = 1
+                spam_count += 1
+            elif word in spam_top_50:
+                freq_spam += 1.0
+                spam_count += 1
+                        
+        s1 = freq_spam / word_count
+        if s1 <= 0.0:
+            print file_name
+            print len(spam_top_50)
+            print freq_spam
+            print spam_count
+            print s2
+            print body
+        data_set[file_name].percent_spam = spam_count / length
+        data_set[file_name].degree_spam = w1 * s1 + w2 * s2
+        
         #11.) Classification label: Spam or Ham
         if file_name.startswith('ham'):
             data_set[file_name].spam = 1
         else:
             data_set[file_name].spam = 2
       
-    for key in data_set.keys():
-        print data_set[key].stringFile()
+    #for key in data_set.keys():
+    #    print data_set[key]
     #Repeat for ham files
 
 
 def main():
-    if len(sys.argv) != 4:
-        print 'usage: ./dataset.py ham_dir spam_dir %_to_sample'
+    if len(sys.argv) != 5:
+        print 'usage: ./dataset.py home_dir ham_dir spam_dir %_to_sample'
         sys.exit(1)
-    home_dir = sys.argv[0][:-10]
-    ham_dir =  sys.argv[1]
-    spam_dir = sys.argv[2]
-    sample_size = int(sys.argv[3]) / 100.0 # as a %
+    home_dir = sys.argv[1]
+    ham_dir =  sys.argv[2]
+    spam_dir = sys.argv[3]
+    sample_size = int(sys.argv[4]) / 100.0 # as a %
     #Sample ham and spam, don't use the entire corpus
     ham_word_count, ham_top_50 = build_thesaurus(home_dir, ham_dir, 1.0) #Check against all ham files
     spam_word_count, spam_top_50 = build_thesaurus(home_dir, spam_dir, sample_size)  
-    unique_spam = spam_unique(home_dir, ham_word_count, spam_word_count)
+    unique_spam = spam_unique(home_dir, ham_word_count, spam_word_count) #Appears in only a single SPAM
     
-    build_dataset(home_dir, spam_dir, spam_word_count, spam_top_50)
+    build_dataset(home_dir, spam_dir, unique_spam, spam_top_50)
 
 
 if __name__ == '__main__':
