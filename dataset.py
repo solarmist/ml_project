@@ -17,7 +17,7 @@ Optional: Inside the home directory there is an ignore list of words to discard
 """
 
 import sys, os
-import random, string, email, re
+import random, string, email, re, hashlib
 import nltk, nltk.corpus
 
 class DataMember:
@@ -182,7 +182,7 @@ def word_count_dict(home_dir, dir, percent = 0.1):
             #Ensure all items are unique
             while file_list[index] in sample_files:
                 index =  int(random.uniform(0,count))
-
+                
             sample_files.append( file_list[index] )
         
     #Load the list of words to ignore (optional)
@@ -252,7 +252,7 @@ def spam_unique(home_dir, ham, spam):
     return unique
 
 
-def build_dataset(home_dir, dir, unique_spam, spam_top_50):
+def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
     """Build dataset
     Data set should have the fields
     1.) IP Address from the received field in the header
@@ -269,7 +269,6 @@ def build_dataset(home_dir, dir, unique_spam, spam_top_50):
     
     file_list = os.listdir(home_dir + dir)
     count = len(file_list)
-    data_set = {}
     for file_name in file_list:
         data_set[file_name] = DataMember()
         #Ignore files that start with .
@@ -289,15 +288,41 @@ def build_dataset(home_dir, dir, unique_spam, spam_top_50):
                 if address != '127.0.0.1':
                     data_set[file_name].ip_address += address + ' '
                         
-            #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
-                        
             #3.) Subject (Easy just read it)          
             if key == 'Subject':
-                data_set[file_name].subject = mail[key]
+                data_set[file_name].subject = repr(mail[key])[1:-1]
                 
             #4.) Name from the From field (Easy just read it)
             if key == 'From':
-                data_set[file_name].name = mail[key]
+                data_set[file_name].name = repr(mail[key])[1:-1]
+        
+        #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
+        from_domain = re.search('@[\[\]\w+\.]+', mail['From'])
+        if str(from_domain) != 'None':
+            from_domain = from_domain.group()[1:]
+        else:
+            #Non-ascii domain name, pull out the hex encoding
+            from_domain = repr(mail['From']).replace('\\x','')
+            if from_domain.find('@') == -1:
+                from_domain = ' '
+            else:
+                from_domain = re.search('@[\[\]\w+\.]+', from_domain).group()[1:]
+        
+        message_domain = re.search('@[\[\]\w+\.]+',mail['Message-ID'])
+        if str(message_domain) != 'None':
+            message_domain = message_domain.group()[1:]
+        else:
+            #Non-ascii domain name, pull out the hex encoding
+            message_domain = repr(mail['Message-ID']).replace('\\x','')
+            if message_domain.find('@') == -1:
+                message_domain = ' '
+            else:
+                message_domain = re.search('@[\[\]\w+\.]+', message_domain).group()[1:]
+                
+        distance = nltk.edit_distance(from_domain, message_domain)
+        domain_len = max(len(from_domain), len(message_domain), 1) * 1.0
+        
+        data_set[file_name].degree_domains_match = 1.0 - distance / domain_len
                 
         #Get the length of the message and the text
         length = (get_message_len(mail) * 1.0)
@@ -338,13 +363,7 @@ def build_dataset(home_dir, dir, unique_spam, spam_top_50):
                 spam_count += 1
                         
         s1 = freq_spam / word_count
-        if s1 <= 0.0:
-            print file_name
-            print len(spam_top_50)
-            print freq_spam
-            print spam_count
-            print s2
-            print body
+        
         data_set[file_name].percent_spam = spam_count / length
         data_set[file_name].degree_spam = w1 * s1 + w2 * s2
         
@@ -353,9 +372,10 @@ def build_dataset(home_dir, dir, unique_spam, spam_top_50):
             data_set[file_name].spam = 1
         else:
             data_set[file_name].spam = 2
-      
+
     #for key in data_set.keys():
     #    print data_set[key]
+    return data_set
     #Repeat for ham files
 
 
@@ -372,7 +392,20 @@ def main():
     spam_word_count, spam_top_50 = build_thesaurus(home_dir, spam_dir, sample_size)  
     unique_spam = spam_unique(home_dir, ham_word_count, spam_word_count) #Appears in only a single SPAM
     
-    build_dataset(home_dir, spam_dir, unique_spam, spam_top_50)
+    spam_data_set = {}
+    spam_data_set = build_dataset(spam_data_set, home_dir, spam_dir, unique_spam, spam_top_50)
+    ham_data_set = {}
+    ham_data_set = build_dataset(ham_data_set, home_dir, ham_dir, unique_spam, spam_top_50)
+    
+    data_set_file = open(home_dir + 'spamDataset.txt', 'w')
+    for key in spam_data_set.keys():
+        data_set_file.write(spam_data_set[key].file_out() + '\n')
+    data_set_file.close()
+    
+    data_set_file = open(home_dir + 'hamDataset.txt', 'w')
+    for key in ham_data_set.keys():
+        data_set_file.write(ham_data_set[key].file_out() + '\n')
+    data_set_file.close()
 
 
 if __name__ == '__main__':
