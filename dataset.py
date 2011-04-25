@@ -23,10 +23,13 @@ import nltk, nltk.corpus
 class DataMember:
     """Defines a line in the dataset"""
     def __init__(self):
-        self.ip_address = ''
+        self.ip_address = 0
+        self.ip_address_str = ''
         self.degree_domains_match = 0.0
-        self.subject = ''
-        self.from_name = ''
+        self.subject = 0
+        self.subject_str = ''
+        self.from_name = 0
+        self.from_name_str = ''
         #type is 1 for HTML, 2 for text, 3 for mixed
         self.type_HTML = 1
         #1 for no attachments, 2 for text attachments, 3 for non-text attachments, 4 for mixed
@@ -293,15 +296,15 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
             if key == 'Received':
                 address = re.search('(\d{1,3}\.){3}\d{1,3}',mail[key]).group()
                 if address != '127.0.0.1':
-                    data_set[file_name].ip_address += address + ' '
+                    data_set[file_name].ip_address_str += address + ' '
                         
             #3.) Subject (Easy just read it)          
             if key == 'Subject':
-                data_set[file_name].subject = repr(mail[key])[1:-1]
+                data_set[file_name].subject_str = repr(mail[key])[1:-1]
                 
             #4.) Name from the From field (Easy just read it)
             if key == 'From':
-                data_set[file_name].from_name = repr(mail[key])[1:-1]
+                data_set[file_name].from_name_str = repr(mail[key])[1:-1]
         
         #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
         from_domain = re.search('@[\[\]\w+\.]+', mail['From'])
@@ -380,17 +383,23 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
         else:
             data_set[file_name].spam = 2
         #Fields that need to be md5 encoded are: IP address, Subject, and from
+        #base = hashlib.md5()
+        #base.update('')
+        #base_int = int(base.hexdigest(),16)
+        #Mod 4 bytes
+        base_int = int('0xffffffff',16)
+        
         ip_address_md5 = hashlib.md5()
-        ip_address_md5.update(data_set[file_name].ip_address)
-        data_set[file_name].ip_address = ip_address_md5.hexdigest()
+        ip_address_md5.update(data_set[file_name].ip_address_str)
+        data_set[file_name].ip_address = int(ip_address_md5.hexdigest(),16) % base_int
         
         subject_md5 = hashlib.md5()
-        subject_md5.update(data_set[file_name].subject)
-        data_set[file_name].subject = subject_md5.hexdigest()
+        subject_md5.update(data_set[file_name].subject_str)
+        data_set[file_name].subject = int(subject_md5.hexdigest(),16) % base_int
         
         from_name_md5 = hashlib.md5()
-        from_name_md5.update(data_set[file_name].from_name)
-        data_set[file_name].from_name = from_name_md5.hexdigest()
+        from_name_md5.update(data_set[file_name].from_name_str)
+        data_set[file_name].from_name = int(from_name_md5.hexdigest(),16) % base_int
 
     #for key in data_set.keys():
     #    print data_set[key]
@@ -416,16 +425,44 @@ def main():
     ham_data_set = {}
     ham_data_set = build_dataset(ham_data_set, home_dir, ham_dir, unique_spam, spam_top_50)
     
+    data_set_arff = open(home_dir + 'dataset.arff', 'w')
+    data_set_arff.write("""% 1. Title: Spam Classification Decision Tree
+% 
+% 2. Sources:
+%      (a) Creator: Joshua Olson
+%      (b) Date: April, 2011
+% 
+@RELATION spam
+
+@ATTRIBUTE IP		  			NUMERIC
+@ATTRIBUTE degree_domains_match	REAL
+@ATTRIBUTE Subject				NUMERIC
+@ATTRIBUTE From					NUMERIC
+@ATTRIBUTE text_type			NUMERIC
+@ATTRIBUTE attach				NUMERIC %Or multipart
+@ATTRIBUTE URLs					NUMERIC %Or url
+@ATTRIBUTE URL_percent			REAL	%Or url_per
+@ATTRIBUTE SPAM_percent			REAL	%Or spam_word_per
+@ATTRIBUTE degree_spam			REAL	
+@ATTRIBUTE spam					NUMERIC	%Actual classification
+
+@data
+
+""")
+    
     data_set_file = open(home_dir + 'spamDataset.txt', 'w')
     for key in spam_data_set.keys():
         data_set_file.write(spam_data_set[key].file_out() + '\n')
+        data_set_arff.write(spam_data_set[key].file_out() + '\r\n')
     data_set_file.close()
     
     data_set_file = open(home_dir + 'hamDataset.txt', 'w')
     for key in ham_data_set.keys():
-        data_set_file.write(ham_data_set[key].file_out() + '\n')
+        data_set_file.write(ham_data_set[key].file_out() + '\r\n')
+        data_set_arff.write(ham_data_set[key].file_out() + '\r\n')
     data_set_file.close()
 
-
+    data_set_arff.close()
+    
 if __name__ == '__main__':
     main()
