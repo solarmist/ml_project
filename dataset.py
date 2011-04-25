@@ -26,7 +26,7 @@ class DataMember:
         self.ip_address = ''
         self.degree_domains_match = 0.0
         self.subject = ''
-        self.name = ''
+        self.from_name = ''
         #type is 1 for HTML, 2 for text, 3 for mixed
         self.type_HTML = 1
         #1 for no attachments, 2 for text attachments, 3 for non-text attachments, 4 for mixed
@@ -43,7 +43,12 @@ class DataMember:
         return self._print(format)
     
     def file_out(self):
-        format = '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s'
+        seperator = ', '
+        format = '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + '%s'
         return self._print(format)
     
     def _print(self, format):
@@ -51,7 +56,7 @@ class DataMember:
             (self.ip_address,           \
             self.degree_domains_match,  \
             self.subject,               \
-            self.name,                  \
+            self.from_name,             \
             self.type_HTML,             \
             self.attachments,           \
             self.num_urls,              \
@@ -195,7 +200,8 @@ def word_count_dict(home_dir, dir, percent = 0.1):
         
     for file_name in sample_files:
         #Ignore files that start with .
-        if file_name[0] == '.':
+        if file_name[0] == '.' or os.path.isdir(home_dir + dir + '/' + file_name) or \
+            os.path.islink(home_dir + dir + '/' + file_name):
             continue
         input_file = open(home_dir + dir + '/' + file_name, 'r')
         mail = email.message_from_file(input_file)
@@ -272,7 +278,8 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
     for file_name in file_list:
         data_set[file_name] = DataMember()
         #Ignore files that start with .
-        if file_name[0] == '.':
+        if file_name[0] == '.' or os.path.isdir(home_dir + dir + '/' + file_name) or \
+            os.path.islink(home_dir + dir + '/' + file_name):
             continue 
         #print file_name    
         file = open(home_dir + dir + '/' + file_name)
@@ -294,7 +301,7 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
                 
             #4.) Name from the From field (Easy just read it)
             if key == 'From':
-                data_set[file_name].name = repr(mail[key])[1:-1]
+                data_set[file_name].from_name = repr(mail[key])[1:-1]
         
         #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
         from_domain = re.search('@[\[\]\w+\.]+', mail['From'])
@@ -372,6 +379,18 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
             data_set[file_name].spam = 1
         else:
             data_set[file_name].spam = 2
+        #Fields that need to be md5 encoded are: IP address, Subject, and from
+        ip_address_md5 = hashlib.md5()
+        ip_address_md5.update(data_set[file_name].ip_address)
+        data_set[file_name].ip_address = ip_address_md5.hexdigest()
+        
+        subject_md5 = hashlib.md5()
+        subject_md5.update(data_set[file_name].subject)
+        data_set[file_name].subject = subject_md5.hexdigest()
+        
+        from_name_md5 = hashlib.md5()
+        from_name_md5.update(data_set[file_name].from_name)
+        data_set[file_name].from_name = from_name_md5.hexdigest()
 
     #for key in data_set.keys():
     #    print data_set[key]
