@@ -68,7 +68,27 @@ class DataMember:
             self.degree_spam,           \
             self.spam)    
     
-
+    def file_test_out(self):
+        output = ''
+        seperator = ', '
+        format = '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + \
+                 '%s' + seperator + '%s' + seperator + '?'
+        output = format % \
+                     (self.ip_address,           \
+                     self.degree_domains_match,  \
+                     self.subject,               \
+                     self.from_name,             \
+                     self.type_HTML,             \
+                     self.attachments,           \
+                     self.num_urls,              \
+                     self.percent_urls,          \
+                     self.percent_spam,          \
+                     self.degree_spam)
+        return output
+    
 
 def get_message_body(mail):
     text = ''
@@ -425,8 +445,7 @@ def main():
     ham_data_set = {}
     ham_data_set = build_dataset(ham_data_set, home_dir, ham_dir, unique_spam, spam_top_50)
     
-    data_set_arff = open(home_dir + 'dataset.arff', 'w')
-    data_set_arff.write("""% 1. Title: Spam Classification Decision Tree
+    header ="""% 1. Title: Spam Classification Decision Tree
 % 
 % 2. Sources:
 %      (a) Creator: Joshua Olson
@@ -444,23 +463,20 @@ def main():
 @ATTRIBUTE URL_percent			REAL	%Or url_per
 @ATTRIBUTE SPAM_percent			REAL	%Or spam_word_per
 @ATTRIBUTE degree_spam			REAL	
-@ATTRIBUTE spam					NUMERIC	%Actual classification
+@ATTRIBUTE spam					{1, 2}	%Actual classification (This needs to be in discrete classes)
 
 @data
 
-""")
+"""
+
+    data_set_arff = open(home_dir + 'dataset.arff', 'w')
+    data_set_arff.write(header)
     
-    data_set_file = open(home_dir + 'spamDataset.txt', 'w')
     for key in spam_data_set.keys():
-        data_set_file.write(spam_data_set[key].file_out() + '\n')
-        data_set_arff.write(spam_data_set[key].file_out() + '\r\n')
-    data_set_file.close()
+        data_set_arff.write(spam_data_set[key].file_out() + '\n')
     
-    data_set_file = open(home_dir + 'hamDataset.txt', 'w')
     for key in ham_data_set.keys():
-        data_set_file.write(ham_data_set[key].file_out() + '\r\n')
         data_set_arff.write(ham_data_set[key].file_out() + '\r\n')
-    data_set_file.close()
 
     data_set_arff.close()
     
