@@ -402,24 +402,18 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
             data_set[file_name].spam = 1
         else:
             data_set[file_name].spam = 2
-        #Fields that need to be md5 encoded are: IP address, Subject, and from
-        #base = hashlib.md5()
-        #base.update('')
-        #base_int = int(base.hexdigest(),16)
-        #Mod 4 bytes
-        base_int = int('0xffffffff',16)
-        
+        #Fields that need to be md5 encoded are: IP address, Subject, and from        
         ip_address_md5 = hashlib.md5()
         ip_address_md5.update(data_set[file_name].ip_address_str)
-        data_set[file_name].ip_address = int(ip_address_md5.hexdigest(),16) % base_int
+        data_set[file_name].ip_address = int(ip_address_md5.hexdigest(),16)
         
         subject_md5 = hashlib.md5()
         subject_md5.update(data_set[file_name].subject_str)
-        data_set[file_name].subject = int(subject_md5.hexdigest(),16) % base_int
+        data_set[file_name].subject = int(subject_md5.hexdigest(),16) 
         
         from_name_md5 = hashlib.md5()
         from_name_md5.update(data_set[file_name].from_name_str)
-        data_set[file_name].from_name = int(from_name_md5.hexdigest(),16) % base_int
+        data_set[file_name].from_name = int(from_name_md5.hexdigest(),16) 
 
     #for key in data_set.keys():
     #    print data_set[key]
