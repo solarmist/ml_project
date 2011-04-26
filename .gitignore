@@ -1,0 +1,6 @@
+ham
+spam
+*.txt
+*.arff
+*.exp
+folds.sh
