@@ -327,7 +327,10 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
                 data_set[file_name].from_name_str = repr(mail[key])[1:-1]
         
         #2.) Matching degree of domain names between Message-Id and (Received/From ??) field (Easy just read and compare)
-        from_domain = re.search('@[\[\]\w+\.]+', mail['From'])
+        if mail['From'] != None:
+            from_domain = re.search('@[\[\]\w+\.]+', mail['From'])
+        else:
+            from_domain = None;
         if str(from_domain) != 'None':
             from_domain = from_domain.group()[1:]
         else:
@@ -337,13 +340,13 @@ def build_dataset(data_set, home_dir, dir, unique_spam, spam_top_50):
                 from_domain = ' '
             else:
                 from_domain = re.search('@[\[\]\w+\.]+', from_domain).group()[1:]
-        
         message_domain = re.search('@[\[\]\w+\.]+',mail['Message-ID'])
         if str(message_domain) != 'None':
             message_domain = message_domain.group()[1:]
         else:
             #Non-ascii domain name, pull out the hex encoding
             message_domain = repr(mail['Message-ID']).replace('\\x','')
+            message_domain = repr(mail['Message-ID']).replace('%','')
             if message_domain.find('@') == -1:
                 message_domain = ' '
             else:
